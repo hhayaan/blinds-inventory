@@ -10,7 +10,7 @@ Writes require `Content-Type: application/json`. Unknown body fields are rejecte
 
 | Method and path | Request / result |
 | --- | --- |
-| `GET /api/health` | `{app: "Windowstock", status: "ok", version: "0.1.0", storage: "sqlite"}` after a database read. |
+| `GET /api/health` | `{app: "Windowstock", status: "ok", version: "0.1.0", storage: "sqlite", launcher_id: "<opaque identifier>"}` after a database read. |
 | `GET /api/products` | Product array, active only by default; `?include_archived=true` includes archived products. ID ascending. |
 | `POST /api/products` | Product metadata; returns the created Product with HTTP 201, generated barcode, quantity 0, revision 1. |
 | `GET /api/products/{id}` | One Product, including archived products. |
@@ -22,6 +22,8 @@ Writes require `Content-Type: application/json`. Unknown body fields are rejecte
 | `GET /api/backup` | Downloadable, consistent SQLite backup including committed WAL data and retry records. |
 
 There is no pagination, catalogue filtering/sorting API, or delete endpoint. `/` serves the main interface and `/static/` serves its assets. `/print?product_id=1&copies=3&width=70&height=40` serves the label page; its JavaScript validates product ID, copies 1–100, width 40–200 mm, and height 25–150 mm, then fetches the canonical Product and SVG. Print controls wait for images to load. Label generation never receives stock.
+
+`launcher_id` is an additive health field used by the source and portable launchers to identify the existing installation and selected inventory database. It is a deterministic SHA-256 identifier derived from their resolved, OS-normalized paths; it does not expose those paths or grant authentication. Treat it as opaque. A launcher reopens an occupied port only when `app`, `status`, and `launcher_id` all match its expected instance. Another installation, another database, or an older health response without this field is not reused. Stop and restart older running instances before using the updated launcher.
 
 ## Product fields
 

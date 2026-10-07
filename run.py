@@ -16,7 +16,7 @@ import webbrowser
 import uvicorn
 
 from inventory.main import create_app
-from inventory.paths import default_database_path, is_frozen
+from inventory.paths import is_frozen, launcher_identity, resolve_database_path
 
 
 def bind_server_socket(port: int) -> socket.socket:
@@ -37,8 +37,9 @@ def bind_server_socket(port: int) -> socket.socket:
 def exit_with_error(message: str, *, no_browser: bool) -> None:
     print(f"\nWindowstock could not start: {message}", file=sys.stderr)
     # A double-clicked console otherwise disappears before the message is read.
-    # Headless CLI checks and normal development commands must never wait here.
-    if is_frozen() and not no_browser and sys.stdin and sys.stdin.isatty():
+    # Both source and portable launchers open their own visible Python console.
+    # Headless CLI checks must never wait here.
+    if not no_browser and sys.stdin and sys.stdin.isatty():
         try:
             input("Press Enter to close this window.")
         except (EOFError, KeyboardInterrupt):
@@ -55,9 +56,33 @@ def read_health(url: str) -> dict | None:
         return None
 
 
-def open_when_ready(url: str) -> None:
+def is_matching_instance(health: dict | None, instance_id: str) -> bool:
+    return bool(
+        health
+        and health.get("app") == "Windowstock"
+        and health.get("status") == "ok"
+        and health.get("launcher_id") == instance_id
+    )
+
+
+def reuse_running_instance(url: str, instance_id: str, *, no_browser: bool) -> bool:
+    """Reopen our server after a bind conflict, including simultaneous starts."""
+    deadline = time.monotonic() + 2.0
+    while True:
+        health = read_health(url)
+        if is_matching_instance(health, instance_id):
+            print(f"Windowstock is already running at {url}")
+            if not no_browser:
+                webbrowser.open(url)
+            return True
+        if health is not None or time.monotonic() >= deadline:
+            return False
+        time.sleep(0.1)
+
+
+def open_when_ready(url: str, instance_id: str) -> None:
     for _ in range(100):
-        if read_health(url):
+        if is_matching_instance(read_health(url), instance_id):
             webbrowser.open(url)
             return
         time.sleep(0.1)
@@ -77,21 +102,14 @@ def main() -> None:
     parser.add_argument("--database", type=Path, help="Optional SQLite path for an isolated demo.")
     args = parser.parse_args()
     url = f"http://127.0.0.1:{args.port}"
-
-    if not is_frozen():
-        with socket.socket() as probe:
-            in_use = probe.connect_ex(("127.0.0.1", args.port)) == 0
-        if in_use:
-            health = read_health(url)
-            if health and health.get("app") == "Windowstock" and not args.database:
-                print(f"Windowstock is already running at {url}")
-                if not args.no_browser:
-                    webbrowser.open(url)
-                return
+    database_path = resolve_database_path(args.database)
+    instance_id = launcher_identity(database_path)
 
     try:
         listener = bind_server_socket(args.port)
     except OSError as error:
+        if reuse_running_instance(url, instance_id, no_browser=args.no_browser):
+            return
         exit_with_error(
             f"Cannot listen on port {args.port}. It may already be in use. "
             f"Close the other instance or choose another port with --port. ({error})",
@@ -100,7 +118,7 @@ def main() -> None:
 
     with listener:
         try:
-            application = create_app(args.database)
+            application = create_app(database_path)
             print(
                 f"Windowstock: {url}\n"
                 f"Inventory database: {application.state.db_path}\n"
@@ -112,13 +130,19 @@ def main() -> None:
                 loop="asyncio", http="h11", ws="none", lifespan="on",
             )
             if not args.no_browser:
-                threading.Thread(target=open_when_ready, args=(url,), daemon=True).start()
-            uvicorn.Server(config).run(sockets=[listener])
+                threading.Thread(
+                    target=open_when_ready, args=(url, instance_id), daemon=True,
+                ).start()
+            try:
+                uvicorn.Server(config).run(sockets=[listener])
+            except KeyboardInterrupt:
+                # Uvicorn has already completed its graceful shutdown. Python's
+                # asyncio runner then re-raises Ctrl+C; it is a normal exit.
+                pass
         except Exception as error:
-            database = args.database or default_database_path()
             exit_with_error(
                 f"{error}\nCheck that the application folder is writable. "
-                f"Database: {database}",
+                f"Database: {database_path}",
                 no_browser=args.no_browser,
             )
 

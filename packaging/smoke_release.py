@@ -1,6 +1,7 @@
 """Exercise the actual Windows executable using only disposable inventory."""
 
 from contextlib import closing, contextmanager
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -30,14 +31,34 @@ def request(base_url, path, *, method="GET", payload=None, expected=200):
         return json.loads(body) if "application/json" in response.headers.get("Content-Type", "") else body
 
 
+def send_console_ctrl_c(process_id):
+    """Send a real Windows Ctrl+C event only to a disposable test console."""
+    console = ctypes.WinDLL("kernel32", use_last_error=True)
+    console.FreeConsole()
+    if not console.AttachConsole(process_id):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        # The helper shares the test console, so protect it from its own event.
+        if not console.SetConsoleCtrlHandler(None, True):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if not console.GenerateConsoleCtrlEvent(0, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        time.sleep(0.2)
+    finally:
+        console.FreeConsole()
+
+
 @contextmanager
-def running(executable, port, working_directory, environment, log_path):
+def running(executable, port, working_directory, environment, log_path, *, force_stop=False, launch_args=()):
     with log_path.open("wb") as output:
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = subprocess.SW_HIDE
         process = subprocess.Popen(
-            [str(executable), "--no-browser", "--port", str(port)],
+            [str(executable), *launch_args, "--no-browser", "--port", str(port)],
             cwd=working_directory, env=environment,
             stdout=output, stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
+            creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup,
         )
         try:
             url = f"http://127.0.0.1:{port}"
@@ -54,14 +75,28 @@ def running(executable, port, working_directory, environment, log_path):
             yield url
         finally:
             if process.poll() is None:
-                # Hidden automation has no console to send Ctrl+C to. SQLite
-                # committed transactions survive this forced-stop/restart check.
-                process.terminate()
                 try:
+                    if force_stop:
+                        process.terminate()
+                    else:
+                        # A separate helper attaches to our test-only console,
+                        # leaving the build runner's own console unaffected.
+                        signal_result = subprocess.run(
+                            [sys.executable, str(Path(__file__).resolve()), "--send-ctrl-c", str(process.pid)],
+                            capture_output=True, text=True, timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                        )
+                        if signal_result.returncode != 0:
+                            raise RuntimeError(f"Could not signal the test console: {signal_result.stderr}")
                     process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=10)
+                    if not force_stop:
+                        shutdown_log = log_path.read_text(errors="replace")
+                        if process.returncode != 0 or "Traceback" in shutdown_log or "Application shutdown complete" not in shutdown_log:
+                            raise RuntimeError(f"Ctrl+C did not stop the server cleanly ({process.returncode}):\n{shutdown_log}")
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=10)
 
 
 def main():
@@ -95,7 +130,7 @@ def main():
         database = extracted / "data" / "inventory.sqlite3"
         log_path = temporary_root / "application.log"
 
-        with running(executable, port, launch_directory, environment, log_path) as url:
+        with running(executable, port, launch_directory, environment, log_path, force_stop=True) as url:
             assert request(url, "/api/products") == [], "Release did not start empty"
             assert database.is_file(), "Database was not created beside the executable"
             assert b"Windowstock" in request(url, "/"), "Bundled main page is unavailable"
@@ -114,6 +149,23 @@ def main():
             assert error["detail"] == "Not enough in stock."
             assert request(url, f"/api/products/{product['id']}")["quantity"] == 2
             assert len(request(url, "/api/movements")) == 2, "Rejected sale changed movement history"
+            relaunched = subprocess.run(
+                [str(executable), "--no-browser", "--port", str(port)],
+                cwd=launch_directory, env=environment,
+                capture_output=True, text=True, timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            assert relaunched.returncode == 0 and "already running" in relaunched.stdout, relaunched.stdout + relaunched.stderr
+            assert request(url, f"/api/products/{product['id']}")["quantity"] == 2
+            different_database = temporary_root / "other-inventory.sqlite3"
+            mismatched = subprocess.run(
+                [str(executable), "--no-browser", "--port", str(port), "--database", str(different_database)],
+                cwd=launch_directory, env=environment,
+                capture_output=True, text=True, timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            assert mismatched.returncode == 1 and "already running" not in mismatched.stdout
+            assert not different_database.exists(), "Relaunch opened an unrelated inventory"
             assert b"<svg" in request(url, f"/api/products/{product['id']}/barcode.svg")
             assert b"label-sheet" in request(url, "/print?product_id=1&copies=2&width=70&height=40")
             backup_path = temporary_root / "backup.sqlite3"
@@ -129,8 +181,11 @@ def main():
             assert len(request(url, "/api/movements")) == 2
         assert sentinel.read_bytes() == sentinel_content
         assert not (bundle / "data").exists(), "Smoke test polluted deliverable"
-        print("Packaged executable verified: empty separate DB, bundled pages, receive/sale, oversale, barcode, backup, restart, retry.")
+        print("Packaged executable verified: separate DB, assets, stock, barcode, backup, restart/retry, matching relaunch, database isolation, clean Windows Ctrl+C.")
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 3 and sys.argv[1] == "--send-ctrl-c":
+        send_console_ctrl_c(int(sys.argv[2]))
+    else:
+        main()

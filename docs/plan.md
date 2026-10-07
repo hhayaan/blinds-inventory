@@ -12,6 +12,7 @@ Confirmed decisions:
 
 - The first version runs on one Windows PC.
 - A browser frontend is acceptable for the skeleton. The final frontend may become a desktop application or an Edge/WebView2-based application; that choice remains open.
+- Keep the local server in a visible console while the application is in use. Closing the browser leaves it running; staff stop it with Ctrl+C in the original server console. Launching the same copy again reopens its existing interface. Automatic shutdown when the browser closes is not planned for this version.
 - Stock is measured in individual items using whole-number quantities.
 - Multiple units of the same sellable item share the same barcode.
 - Receive and sale submissions default to one unit. Staff can scan each unit separately or scan one barcode and choose a positive whole-number count using +/− or direct typing.

@@ -19,17 +19,21 @@ The interface runs in a browser on the same PC as the Python backend and SQLite 
 
 1. Extract the entire `Windowstock.zip` to a writable local folder, such as a folder under Documents. Keep the executable and its bundled files together; do not run it from inside the ZIP.
 2. Double-click **Windowstock.exe** directly inside the folder you extracted into. There is no extra `Windowstock` subfolder in the ZIP. It starts the local server and opens the default browser at <http://127.0.0.1:8767>.
-3. Keep its console window open while using the application. Press **Ctrl+C** in that window, or close it, when finished. Closing the browser alone does not stop the server.
+3. Keep its console window open while using the application. Press **Ctrl+C** in that window when finished; the server shuts down normally and saved inventory remains intact. Closing the browser alone does not stop the server.
+
+If you close the browser while the server is still running, double-click the same **Windowstock.exe** again to reopen the interface. This reuses the existing server for that extracted copy and database; the original console remains the window where you stop it. A different installation, database, or application occupying the port is not reused.
 
 The release requires 64-bit Windows and an existing browser; Python, a separate SQL server, and an internet connection are not required for normal operation. Its first launch creates an empty `data\inventory.sqlite3` beside the executable. This database is separate from the development project's `data` folder and persists when the release restarts. See [portable release instructions](docs/release.md) for updates and troubleshooting.
 
 ## Start on this PC
 
-The project environment has been created with Python 3.14.8. Double-click **Start Inventory.cmd** in this folder. The launcher starts the server and opens:
+The project environment has been created with Python 3.14.8. Double-click **Start Inventory.cmd** in this folder. It starts Python in its own visible console and exits the batch launcher, so Ctrl+C stops Python without the batch file's **Terminate batch job (Y/N)?** prompt. The server opens:
 
 <http://127.0.0.1:8765>
 
 Keep the server window open while using the application. Closing the browser does not stop the server. Press **Ctrl+C** in the server window to stop it. Inventory is saved automatically in SQLite and survives restarts.
+
+To reopen the browser while this server is still running, double-click **Start Inventory.cmd** again. The launcher checks that the running server belongs to this project and its selected database, opens the interface, and exits without starting another server. Stop the server through its original console. If another copy or application occupies the port, the launcher reports the conflict instead of opening that other inventory.
 
 From PowerShell, the equivalent command is:
 

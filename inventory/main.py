@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from starlette.background import BackgroundTask
 
 from .database import open_database, utc_now
-from .paths import default_database_path, is_frozen, resource_root
+from .paths import launcher_identity, resolve_database_path, resource_root
 from .schemas import ArchiveRequest, ProductCreate, ProductPatch, StockRequest
 from .service import InventoryService
 
@@ -27,11 +27,8 @@ LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 def create_app(db_path: str | Path | None = None) -> FastAPI:
-    # An inherited development override must never connect a portable demo to
-    # the developer's inventory. An explicit factory/CLI path remains supported.
-    environment_path = None if is_frozen() else os.environ.get("INVENTORY_DB_PATH")
-    selected_path = db_path or environment_path or default_database_path()
-    database_path = Path(selected_path).expanduser().resolve()
+    database_path = resolve_database_path(db_path)
+    instance_id = launcher_identity(database_path)
     engine = open_database(database_path)
     inventory = InventoryService(engine)
 
@@ -100,7 +97,10 @@ def create_app(db_path: str | Path | None = None) -> FastAPI:
     def health():
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        return {"app": "Windowstock", "status": "ok", "version": "0.1.0", "storage": "sqlite"}
+        return {
+            "app": "Windowstock", "status": "ok", "version": "0.1.0",
+            "storage": "sqlite", "launcher_id": instance_id,
+        }
 
     @application.get("/api/products")
     def products(include_archived: bool = False):

@@ -20,19 +20,19 @@ Windowstock is the working application name. The current deliverable is a Window
 | [run.py](../run.py) | Loopback server startup, port selection, opening the default browser, and detecting an existing instance. |
 | [Setup.ps1](../Setup.ps1), [Start Inventory.cmd](../Start%20Inventory.cmd) | Windows environment setup and staff launcher. |
 | [Build Release.ps1](../Build%20Release.ps1), [packaging/windowstock.spec](../packaging/windowstock.spec) | Repeatable one-folder PyInstaller build and ZIP creation. Generated output stays under `release/`. |
-| [packaging/smoke_release.py](../packaging/smoke_release.py) | Runs the actual staged executable with disposable inventory and validates assets, stock, backups, isolation, restart, and retries before ZIP creation. |
+| [packaging/smoke_release.py](../packaging/smoke_release.py) | Runs the actual staged executable with disposable inventory and validates assets, stock, backups, isolation, restart/retry, matching relaunch, and real Windows Ctrl+C before ZIP creation. |
 | [packaging/START HERE.txt](../packaging/START%20HERE.txt), [packaging/release_manifest.py](../packaging/release_manifest.py) | Recipient instructions and generated build/runtime version information included in the release. |
 | [inventory/main.py](../inventory/main.py) | FastAPI app factory, HTTP routes, local-access middleware, SVG barcodes, SQLite backup, and static page serving. |
 | [inventory/schemas.py](../inventory/schemas.py) | Pydantic input models, allowed metadata, normalization, and field limits. Unknown fields are rejected. |
 | [inventory/service.py](../inventory/service.py) | Inventory rules, transactions, revision checks, response serialization, and persisted scan retries. It currently raises FastAPI HTTP exceptions. |
 | [inventory/database.py](../inventory/database.py) | SQLAlchemy tables, UTC timestamps, SQLite engine and connection settings. |
-| [inventory/paths.py](../inventory/paths.py) | Source/bundle resource roots and the separate portable database location. |
+| [inventory/paths.py](../inventory/paths.py) | Source/bundle resource roots, database selection, and installation/database launcher identity. |
 | [web/index.html](../web/index.html), [web/styles.css](../web/styles.css) | Main screens, dialogs, form constraints, and layout. |
 | [web/app.js](../web/app.js) | API calls, rendering, forms, scan submission/recovery, polling, backup download, and opening labels. |
 | [web/print.html](../web/print.html), [web/print.js](../web/print.js), [web/print.css](../web/print.css) | Separate printable label page, query validation, image readiness, physical dimensions, and print styling. |
 | [tests/test_inventory_api.py](../tests/test_inventory_api.py) | Stock, edit, retry, concurrency, barcode and backup integration checks. |
 | [tests/test_local_access.py](../tests/test_local_access.py), [tests/conftest.py](../tests/conftest.py) | Local HTTP restrictions and isolated app/database fixtures. |
-| [tests/test_portable_runtime.py](../tests/test_portable_runtime.py) | Frozen resource paths, independent database defaults, and release listener isolation. |
+| [tests/test_portable_runtime.py](../tests/test_portable_runtime.py) | Frozen resource paths, database isolation, same-instance relaunch, conflicting instances, and Ctrl+C handling. |
 | `data/` | Working SQLite files. Preserve separately from source updates. Ignored by Git. |
 | `.venv/`, `.validation/` | Machine-specific Python environment and disposable validation artifacts. Neither is application source or a required delivery file. |
 | `release/` | Generated build work, packaged program folder, and distributable ZIP. Ignored by Git and replaceable by another build. Never keep the only copy of valued demonstration inventory here. |
@@ -54,10 +54,14 @@ Setup expects Python 3.14 and detects the standard per-user `Python314` location
 | --- | --- |
 | Host | Fixed `127.0.0.1`; no LAN mode. |
 | Port | Development `8765`; packaged release `8767`; overridden with `--port`. |
-| Browser | Opened after startup; `--no-browser` suppresses it. |
+| Browser | Opened after matching health is ready, or reopened for an existing matching instance; `--no-browser` suppresses both. |
 | Database | Explicit `create_app(db_path)` takes precedence. Source mode next uses `INVENTORY_DB_PATH`, then project `data/inventory.sqlite3`. Frozen mode ignores the inherited environment variable and defaults to `data/inventory.sqlite3` beside the executable. |
 | `--database` | Passes an explicit database path to the factory. Relative paths resolve from the process's current working directory; use an absolute path when that location is uncertain. |
-| Existing process | Source mode may reuse an existing Windowstock server at the selected port when no `--database` is supplied. A frozen release always reserves its own listener and rejects an occupied port, so it cannot accidentally connect to another copy's inventory. |
+| Existing process | Both source and frozen modes first reserve the selected loopback listener. On a bind conflict they query health and reuse only an instance matching the application installation and resolved selected database, including an explicit `--database`. Other applications, installations, databases, and legacy health responses without `launcher_id` remain port conflicts. |
+
+`Start Inventory.cmd` starts the project's Python directly in a separate visible console and exits, rather than running Python inside an ongoing batch job. Staff stop the server with Ctrl+C in that original console; the expected interrupt is handled after Uvicorn's graceful shutdown without a traceback or **Terminate batch job** prompt. Closing the browser leaves the backend running. Relaunching the same copy reopens its interface and exits the new launcher without taking ownership of the original server. Source edits require stopping and restarting that server; relaunching alone does not reload it.
+
+`inventory.paths.resolve_database_path()` applies the same database-selection rules before startup and before reuse, without opening the database. `launcher_identity()` hashes the OS-normalized resolved installation and database paths; `/api/health` returns this opaque `launcher_id`. The installation root is the source project root or the directory containing the packaged executable, independently of the bundle's resource location. This is an inventory-selection check, not authentication. Browser opening after startup also requires matching health. After a port conflict, the launcher allows a brief readiness interval for an instance that is still starting. Interactive startup errors remain visible until Enter; `--no-browser` checks never wait for that prompt.
 
 `inventory.main:create_app` is an app factory, not a global `app` object. Creating an app opens/creates the selected database and missing tables immediately; shutdown disposes the engine. Importing the module alone does not open the working database. This is important for test isolation.
 
@@ -114,7 +118,9 @@ This is recovery for an uncertain request, not an offline queue. Session storage
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-Tests create fresh databases through `create_app(tmp_path)` and use a loopback TestClient URL. They do not require a running server or alter working inventory. The latest recorded result was **89 passing tests**, including grouped counts, backward-compatible retries, and portable runtime isolation, on October 7, 2026; this is a dated baseline, not a guarantee for a later checkout. A dependency deprecation warning about TestClient/httpx was present without test failures.
+Tests create fresh databases through `create_app(tmp_path)` and use a loopback TestClient URL. They do not require a running server or alter working inventory. The latest recorded result was **106 passing tests**, including grouped counts, backward-compatible retries, portable runtime isolation, same-instance relaunch, and normal Ctrl+C handling, on October 7, 2026; this is a dated baseline, not a guarantee for a later checkout. A dependency deprecation warning about TestClient/httpx was present without test failures.
+
+Real source and packaged processes were also checked with disposable databases: relaunch reused the original server, Windows console Ctrl+C completed shutdown with exit code zero and no traceback, and the selected port was released. The source browser-open call was observed through a temporary test hook; the packaged reuse check ran headlessly. These process checks do not establish another-PC compatibility. See [release.md](release.md#verification-recorded-october-7-2026) for the packaged verification details.
 
 For a UI change, use the isolated demo database and exercise the affected workflow. For changes to stock handling, include repeated intentional scans, grouped counts, invalid count entry, overlarge/zero-stock sale rejection, a stale form, and disconnect/reload/retry. For labels, check copy count, millimetre dimensions, loaded barcodes, and Print / Save as PDF in Edge or Chrome. The project has no automated browser test suite. API tests cannot establish physical scan readability or printer alignment.
 

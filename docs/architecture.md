@@ -29,6 +29,8 @@ flowchart LR
 
 All components run on one PC. The backend binds to loopback for the local skeleton. `Start Inventory.cmd` starts the source launcher; the portable `Windowstock.exe` contains the same launcher with its Python runtime and web assets. Both start the backend and open the default browser. A native/WebView2 desktop window and installer remain future work.
 
+Closing the browser leaves the backend running in its visible console. Relaunching the same source project or extracted release reopens the browser when the running server matches the installation and selected database. The second launcher exits; the original console remains responsible for the server. **Ctrl+C** there performs a normal shutdown. A server from another installation or database is rejected even if it uses the same port. There is no browser-close shutdown or automatic Windows startup service.
+
 ## 2. Component responsibilities
 
 | Component | Responsibility |
@@ -160,9 +162,9 @@ Before this phase, add the required authentication/permissions, HTTPS, configura
 
 ## 8. Validation and remaining milestones
 
-The skeleton has 89 passing API integration, local-access, and portable-runtime tests as of October 7, 2026. They cover stock transactions, grouped counts, strict quantity validation, legacy/grouped retries, stale edits, concurrent bulk sales, barcode generation, backup restoration, local request restrictions, and frozen resource/database/listener isolation. Browser checks cover product creation/editing, repeated and grouped receipts, sales, insufficient-stock rejection, invalid count entry, corrections, returns, history, archive/restore, backup download, and rendered label sheets. New installations start empty; validation uses a separate database.
+The skeleton has 106 passing API integration, local-access, and portable-runtime tests as of October 7, 2026. They cover stock transactions, grouped counts, strict quantity validation, legacy/grouped retries, stale edits, concurrent bulk sales, barcode generation, backup restoration, local request restrictions, frozen resource/database isolation, matching-instance relaunch, and normal interrupt handling. Browser checks cover product creation/editing, repeated and grouped receipts, sales, insufficient-stock rejection, invalid count entry, corrections, returns, history, archive/restore, backup download, and rendered label sheets. New installations start empty; validation uses a separate database.
 
-The actual packaged executable also passed startup, asset loading, separate empty database, grouped stock, oversale rejection, SVG barcode, backup, forced restart, and retry checks on October 7, 2026. The smoke test launches a disposable staged copy from another working directory with no Python on `PATH`; the development database sentinel remains unchanged. See [release.md](release.md#verification-recorded-october-7-2026) for the recorded result and repeatable process. A second Windows PC has not yet been tested.
+The actual packaged executable also passed startup, asset loading, separate empty database, grouped stock, oversale rejection, SVG barcode, backup, forced restart, retry, matching-instance reuse, mismatched-database refusal, and real Windows console Ctrl+C shutdown checks on October 7, 2026. The smoke test launches a disposable staged copy from another working directory with no Python on `PATH`; the development database sentinel remains unchanged. See [release.md](release.md#verification-recorded-october-7-2026) for the recorded result and repeatable process. A second Windows PC has not yet been tested.
 
 Physical scanner/printer checks, a native/WebView2 desktop window, and shared-server deployment remain pending. Browser print/PDF output must be reviewed in the company's chosen browser and with its chosen label stock; the current automated browser checked rendered labels without producing a PDF. Review the extracted ZIP on the destination PC as part of demonstration handoff.
 

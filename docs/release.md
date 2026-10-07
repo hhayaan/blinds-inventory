@@ -7,7 +7,9 @@ Windowstock is distributed as a ZIP containing a Windows executable and its bund
 1. Extract the **entire** `Windowstock.zip` to a writable local folder, for example under Documents. Do not run the executable from inside the ZIP or move it away from the bundled `_internal` folder.
 2. Double-click **Windowstock.exe** directly inside the folder you extracted into.
 3. The app opens the default browser at `http://127.0.0.1:8767`. If the browser does not open, visit that address manually after the console reports startup.
-4. Keep the console window open while using the app. Stop the server with **Ctrl+C** in that window when finished. Closing the browser alone leaves the server running.
+4. Keep the console window open while using the app. Stop the server with **Ctrl+C** in that window when finished. The server completes its normal shutdown without an interrupt traceback; saved inventory remains intact. Closing the browser alone leaves the server running.
+
+To reopen the interface after closing the browser, double-click the same **Windowstock.exe** again. It verifies that the existing server belongs to this extracted application and the selected database, opens the browser, and exits. The original console continues to run the server; use **Ctrl+C** there to stop it. The launcher does not reuse a different extracted copy, development instance, database, or unrelated application at the same port.
 
 Requirements are 64-bit Windows and an existing browser, such as Edge or Chrome. The bundled application includes its Python runtime and required libraries. Normal inventory use requires no internet connection, database server, or development tools.
 
@@ -67,23 +69,26 @@ The build includes the application modules, bundled frontend, required dependenc
 
 Run the project tests, then test a copy extracted from the newly generated ZIP. The packaged copy needs its own temporary database; do not test against development inventory or send the QA copy with test products.
 
-Check that it starts from a directory other than its own, serves the main and print pages, generates a barcode, receives a grouped quantity, rejects an overlarge sale without changing stock, records a valid sale, downloads a backup, and retains data after a restart. Confirm the shipped archive contains no database, WAL, SHM, or QA files. Physical scanning, printer alignment, and another-PC compatibility require the actual equipment or destination PC; local validation does not replace those checks.
+Check that it starts from a directory other than its own, serves the main and print pages, generates a barcode, receives a grouped quantity, rejects an overlarge sale without changing stock, records a valid sale, downloads a backup, and retains data after a restart. Relaunch the same copy while its server runs and confirm it reopens the original instance. Stop it with Ctrl+C and confirm normal shutdown without a traceback. Confirm the shipped archive contains no database, WAL, SHM, or QA files. Physical scanning, printer alignment, and another-PC compatibility require the actual equipment or destination PC; local validation does not replace those checks.
 
 Ordinary source or frontend changes use the same build command again. Changes to dependencies, dynamically imported modules, bundled assets, launcher paths, or the database schema may also require updates to the saved configuration and additional validation.
 
 ### Verification recorded October 7, 2026
 
-The source suite passed **89 tests**. The actual packaged executable also passed the automated smoke check from a path containing spaces while its working directory was elsewhere. Its `PATH` contained only Windows directories, with no Python installation on the path. An inherited `INVENTORY_DB_PATH` pointed at a sentinel file that remained untouched; the app instead created its own empty database beside the executable.
+The source suite passed **106 tests**, including launcher identity, source/portable relaunch, database isolation, and clean interrupt handling. The actual packaged executable also passed the automated smoke check from a path containing spaces while its working directory was elsewhere. Its `PATH` contained only Windows directories, with no Python installation on the path. An inherited `INVENTORY_DB_PATH` pointed at a sentinel file that remained untouched; the app instead created its own empty database beside the executable.
 
 The packaged app served the bundled main page, JavaScript, CSS, and print assets; created a product; received 3 units; sold 1; and rejected a sale of 3 with **Not enough in stock.** Quantity remained 2 and history contained only the two accepted movements. SVG barcode generation and a downloaded SQLite backup were verified. After a forced stop and restart, quantity remained 2; retrying the original receipt UUID also left quantity and history unchanged. Smoke-test copies and inventory were removed, leaving the distributable empty.
 
-The latest flat ZIP passed CRC and file-content checks: all 187 shipped files matched the generated application folder. The executable and supporting files were directly at the archive root, with no enclosing application folder or bundled inventory database. The source tests were unchanged by the archive-layout update; the packaged executable smoke check was run again during that rebuild.
+Relaunching that same packaged copy with `--no-browser` returned successfully and reported that the original server was already running. A launch requesting another database at the same port was rejected and did not create that database. A real Windows console Ctrl+C event then produced normal server shutdown, exit code zero, and no interrupt traceback. Separate source-process checks also confirmed matching-instance reuse, the browser-open call through a temporary test hook, normal Ctrl+C shutdown, and release of the listener port. These checks used disposable inventory; they did not modify the development database.
+
+The rebuilt flat ZIP passed CRC and file-content checks: all 187 shipped files matched the generated application folder byte for byte. Its size was approximately 21.05 MiB. `Windowstock.exe`, `_internal/`, `START HERE.txt`, and `BUILD INFO.json` were directly at the archive root, with no enclosing application folder or bundled inventory database. The shipped instructions describe relaunching the same copy and stopping through the original console. The source tests and packaged smoke check passed during this rebuild; development and release default ports were no longer listening after validation.
 
 These checks ran on the development PC using the bundled runtime. A second Windows PC and physical scanner/printer have not yet been tested.
 
 ## Troubleshooting
 
-- **The browser cannot connect:** keep the console open and inspect its startup error. If port 8767 is occupied, stop the earlier copy or run `.\Windowstock.exe --port 8768` from PowerShell in its folder and use the corresponding address.
+- **The browser was closed:** double-click the same executable again. If its server is still running, the interface reopens; if it has stopped, a new server starts.
+- **The browser cannot connect:** keep the console open and inspect its startup error. A matching running copy is reused. If port 8767 belongs to a different copy, database, or application, stop that process through its own console or run `.\Windowstock.exe --port 8768` from PowerShell in this folder and use the corresponding address.
 - **The app cannot write its database:** extract to a writable local folder and retain its `data` folder. Running from a ZIP or protected directory is unsupported.
 - **An incomplete copy will not start:** extract the entire ZIP again; the executable depends on its bundled files.
 - **Windows blocks the executable:** this demonstration build is unsigned. Follow the recipient company's normal software approval process; packaging does not provide code signing or an installer.

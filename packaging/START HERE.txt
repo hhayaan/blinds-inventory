@@ -6,8 +6,14 @@ WINDOWSTOCK - PORTABLE DEMONSTRATION
 3. Your default browser opens the inventory interface. If it does not open,
    visit http://127.0.0.1:8767 while the application window is running.
 4. Keep the console/server window open while using inventory. Press Ctrl+C
-   in that window to stop the application. Closing the browser alone does
-   not stop it.
+   in that window to stop the application normally. Closing the browser
+   alone does not stop it. Your saved inventory remains intact.
+
+If you close the browser, double-click the SAME Windowstock.exe again to
+reopen it. A running server for this extracted copy and database is reused;
+no second server starts. The original console remains where you press Ctrl+C
+to stop the application. A different copy or database at the same port is
+not reused.
 
 You do not need Python, an SQL server, an installer, or administrator access.
 An existing browser is required. Normal operation does not require internet.
@@ -41,7 +47,8 @@ or restore the downloaded backup there. Do not copy SQLite -wal/-shm files
 over a running database. Keep your old folder and backup until you confirm
 the new version shows your inventory and history.
 
-If you see a port-in-use error, stop an earlier Windowstock console window.
+If you see a port-in-use error, another copy, database, or application is
+using this address. Stop that process through its own console window.
 For an alternate port, run .\Windowstock.exe --port 8768 from PowerShell in
 this folder, then visit the address displayed. The program never automatically
 opens an unrelated application that happens to use its port.
