@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173b57">
+  <title>Windowstock · Inventory</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Windowstock home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 5h18v22H7zM7 11h18M7 17h18M7 23h18M16 5v22"/></svg></span>
+        <span>Windowstock<small>Blinds &amp; curtains inventory</small></span>
+      </a>
+      <div class="nav-label">WORKSPACE</div>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" data-view="inventory" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h7v7H3zM14 4h7v7h-7zM3 15h7v5H3zM14 15h7v5h-7z"/></svg>Inventory</button>
+        <button class="nav-item" data-view="receive"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 15v5h16v-5"/></svg>Receive stock</button>
+        <button class="nav-item" data-view="sale"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-5 5 5-5 5 5M4 15v5h16v-5"/></svg>Record sale</button>
+        <button class="nav-item" data-view="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a9 9 0 1 1-1 5M4 3v5h5m3-1v6l4 2"/></svg>Stock history</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-card"><span class="local-dot"></span><span>Single PC workspace<small>Your inventory, stored locally.</small></span></div>
+        <button class="backup-link" id="backup-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/></svg>Download database backup</button>
+        <span class="version">Inventory skeleton · v0.1</span>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <span class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumb-view">Inventory</strong></span>
+        <div class="server-status" id="server-status"><span class="status-dot"></span><span id="status-text">Connecting…</span></div>
+        <button class="compact-backup icon-button" id="compact-backup-button" title="Download database backup" aria-label="Download database backup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/></svg></button>
+      </header>
+      <div class="main-content">
+        <div class="page-heading">
+          <div><div class="eyebrow" id="page-eyebrow">YOUR STOCK, AT A GLANCE</div><h1 id="page-title">Inventory</h1><p id="page-description">A clear view of every product and the units on your shelves.</p></div>
+          <button class="button primary" id="add-product-button"><span aria-hidden="true">＋</span> Add product</button>
+        </div>
+        <div id="global-error" class="notice error" role="alert" hidden></div>
+
+        <section class="view" id="inventory-view" aria-label="Inventory">
+          <div class="metrics">
+            <article class="metric"><div><span class="metric-label">Active products</span><strong id="metric-products">—</strong><span class="metric-caption">Distinct sellable variants</span></div><span class="metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8zm0 10v9M3 8l9 5 9-5M7 5l10 5"/></svg></span></article>
+            <article class="metric"><div><span class="metric-label">Units in stock</span><strong id="metric-units">—</strong><span class="metric-caption">Items ready for sale</span></div><span class="metric-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></svg></span></article>
+            <article class="metric"><div><span class="metric-label">Out of stock</span><strong id="metric-empty">—</strong><span class="metric-caption">Active products at zero units</span></div><span class="metric-icon warm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 10 18H2zm0 6v5m0 3h.01"/></svg></span></article>
+          </div>
+          <div class="card inventory-card">
+            <div class="card-heading"><div><h2>Product inventory <span class="count-pill" id="inventory-count">0</span></h2><p>Each product has one barcode, shared by all its units.</p></div><label class="toggle-label"><input type="checkbox" id="show-archived"> Show archived</label></div>
+            <div class="table-wrap" id="inventory-table-wrap">
+              <table class="inventory-table"><thead><tr><th scope="col">Product</th><th scope="col">Barcode</th><th scope="col">In stock</th><th scope="col">Location</th><th scope="col">Price (CAD)</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="inventory-body"></tbody></table>
+            </div>
+            <div class="empty-state" id="inventory-empty" hidden><span class="empty-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 6 16 9v18l-16 9-16-9V15zm0 18v18M8 15l16 9 16-9m-24-13 16 9"/></svg></span><h3>A place for every product</h3><p>Add your first blind, curtain, or accessory.<br>Then receive units using its barcode.</p><button class="button primary" id="empty-add-button">＋ Add your first product</button></div>
+            <div class="table-foot"><span><span class="tiny-dot"></span> Stock updates automatically</span><span>Quantities are measured in whole items</span></div>
+          </div>
+          <div class="workflow-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5v14m3-14v14m4-14v14m2-14v14m4-14v14m5-14v14"/></svg><div><strong>No scanner needed to get started.</strong><p>Copy a product’s barcode and paste it into Receive stock or Record sale. Receive or sell one unit per scan, or choose a quantity for a group of identical items.</p></div></div>
+        </section>
+
+        <section class="view" id="receive-view" aria-label="Receive stock" hidden>
+          <div class="scan-layout">
+            <div class="card scan-card">
+              <div class="scan-icon receive-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 15v5h16v-5"/></svg></div>
+              <h2>Add items to stock</h2>
+              <p class="scan-description">Enter a product barcode and choose how many identical items to receive. The default is <strong>one item</strong>.</p>
+              <form id="receive-form" class="scan-form" novalidate>
+                <label for="receive-kind">Stock entry</label><select id="receive-kind"><option value="receipt">New stock received</option><option value="return">Customer return</option></select>
+                <label for="receive-barcode">Product barcode</label><input id="receive-barcode" name="barcode" class="barcode-input" type="text" placeholder="e.g. BL-000001" autocomplete="off" spellcheck="false" required>
+                <div class="input-hint">Type or paste a barcode, choose a quantity, then press Enter.</div>
+                <div class="scan-submit-row">
+                  <button type="submit" class="button primary" id="receive-submit">Receive 1 item</button>
+                  <div class="quantity-picker" role="group" aria-label="Receive quantity">
+                    <button type="button" id="receive-decrease" class="quantity-step" aria-label="Decrease receive quantity">−</button>
+                    <label for="receive-quantity" class="sr-only">Receive quantity</label><input id="receive-quantity" name="quantity" type="text" inputmode="numeric" pattern="[0-9]*[1-9][0-9]*" autocomplete="off" value="1" aria-describedby="receive-quantity-hint">
+                    <button type="button" id="receive-increase" class="quantity-step" aria-label="Increase receive quantity">+</button>
+                  </div>
+                </div>
+                <div class="input-hint" id="receive-quantity-hint">Positive whole numbers only. Quantity returns to 1 after a successful entry.</div>
+              </form>
+              <div id="receive-error" class="notice error" role="alert" hidden></div><div id="receive-success" class="transaction-result" role="status" hidden></div>
+            </div>
+            <aside class="card scan-guide"><span class="eyebrow">HOW IT WORKS</span><h2>One item or a whole delivery</h2><ol><li><span>1</span><div><strong>Create the product</strong><p>Add its details in Inventory. A unique barcode is assigned automatically.</p></div></li><li><span>2</span><div><strong>Enter its barcode</strong><p>Copy it from the product row, or type it here to simulate a scanner.</p></div></li><li><span>3</span><div><strong>Choose your quantity</strong><p>Scan each item with a quantity of 1, or enter the barcode once and receive several identical items together. Each entry is recorded in stock history.</p></div></li></ol><div class="guide-foot">A USB scanner that types a barcode and Enter will use the same input field. To correct or remove stock manually, use Edit → Adjust stock in Inventory.</div></aside>
+          </div>
+        </section>
+
+        <section class="view" id="sale-view" aria-label="Record sale" hidden>
+          <div class="scan-layout">
+            <div class="card scan-card">
+              <div class="scan-icon sale-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-5 5 5-5 5 5M4 15v5h16v-5"/></svg></div>
+              <h2>Record sold items</h2>
+              <p class="scan-description">Enter a product barcode and choose how many identical items were sold. The default is <strong>one item</strong>.</p>
+              <form id="sale-form" class="scan-form" novalidate>
+                <label for="sale-barcode">Product barcode</label><input id="sale-barcode" name="barcode" class="barcode-input" type="text" placeholder="e.g. BL-000001" autocomplete="off" spellcheck="false" required>
+                <div class="input-hint">Type or paste a barcode, choose a quantity, then press Enter.</div>
+                <div class="scan-submit-row">
+                  <button type="submit" class="button primary" id="sale-submit">Record sale of 1 item</button>
+                  <div class="quantity-picker" role="group" aria-label="Sale quantity">
+                    <button type="button" id="sale-decrease" class="quantity-step" aria-label="Decrease sale quantity">−</button>
+                    <label for="sale-quantity" class="sr-only">Sale quantity</label><input id="sale-quantity" name="quantity" type="text" inputmode="numeric" pattern="[0-9]*[1-9][0-9]*" autocomplete="off" value="1" aria-describedby="sale-quantity-hint">
+                    <button type="button" id="sale-increase" class="quantity-step" aria-label="Increase sale quantity">+</button>
+                  </div>
+                </div>
+                <div class="input-hint" id="sale-quantity-hint">Positive whole numbers only. Quantity returns to 1 after a successful sale.</div>
+              </form>
+              <div id="sale-error" class="notice error" role="alert" hidden></div><div id="sale-success" class="transaction-result" role="status" hidden></div>
+            </div>
+            <aside class="card scan-guide"><span class="eyebrow">KEEP STOCK ACCURATE</span><h2>Record every unit sold</h2><p>Use the same barcode for every identical unit. If a customer buys three, scan each item or choose a quantity of 3 and submit once.</p><div class="guide-callout"><strong>Products stay in your inventory.</strong><p>A sale changes the quantity and adds a history entry. You can receive stock again when the quantity reaches zero.</p></div><div class="guide-callout"><strong>No stock below zero.</strong><p>A sale is refused if its quantity is greater than the available stock. The whole sale is checked before any units are removed.</p></div><div class="guide-foot">For a customer return, choose Customer return under Receive stock. To correct a stock count, use Edit → Adjust stock in Inventory.</div></aside>
+          </div>
+        </section>
+
+        <section class="view" id="history-view" aria-label="Stock history" hidden>
+          <div class="card"><div class="card-heading"><div><h2>Stock movements <span class="count-pill" id="history-count">0</span></h2><p>A record of receipts, sales, returns, and stock corrections.</p></div></div><div class="table-wrap" id="history-table-wrap"><table class="history-table"><thead><tr><th scope="col">Date &amp; time</th><th scope="col">Product</th><th scope="col">Movement</th><th scope="col">Change</th><th scope="col">Stock after</th><th scope="col">Reason</th></tr></thead><tbody id="history-body"></tbody></table></div><div class="empty-state" id="history-empty" hidden><span class="empty-icon"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 8h24v34H12zM18 5h12v8H18zM18 22h12M18 29h12M18 36h8"/></svg></span><h3>Your stock story starts here</h3><p>Receive an item or record a sale.<br>Every stock change will appear here.</p><button class="button secondary" id="history-receive-button">Receive stock</button></div></div>
+        </section>
+
+        <div id="pending-notice" class="notice warning pending-notice" role="alert" hidden><div><strong>The last scan needs confirmation.</strong><p id="pending-message">The connection was interrupted. The scan may already have been recorded. Retry safely to confirm it.</p></div><div class="pending-actions"><button class="button secondary" id="retry-scan">Retry same scan</button><button class="button text-button" id="dismiss-scan">Check inventory &amp; dismiss</button></div></div>
+      </div>
+      <footer class="main-footer">Windowstock <span>Simple inventory, from shelf to sale.</span></footer>
+    </main>
+  </div>
+
+  <dialog id="product-dialog" class="modal product-modal" aria-labelledby="product-dialog-title"><form id="product-form"><div class="modal-heading"><div><span class="eyebrow">PRODUCT DETAILS</span><h2 id="product-dialog-title">Add a product</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close product dialog">×</button></div><div class="modal-body"><p class="form-intro" id="product-form-intro">A barcode will be generated when you save. Receive stock separately.</p><div class="form-grid"><label class="field span-two"><span>Product name <span class="required">*</span></span><input name="name" required maxlength="160" placeholder="e.g. Light-filtering roller blind"></label><label class="field">Category<input name="category" maxlength="100" placeholder="e.g. Roller blinds"></label><label class="field">Location<input name="location" maxlength="100" placeholder="e.g. Aisle A · Shelf 2"></label><label class="field">Brand<input name="brand" maxlength="100"></label><label class="field">Model<input name="model" maxlength="100"></label><label class="field">Colour<input name="color" maxlength="100" placeholder="e.g. Warm white"></label><label class="field">Material<input name="material" maxlength="100" placeholder="e.g. Polyester"></label><div class="dimension-fields span-two"><label class="field">Width<input name="width" type="number" min="0.000001" max="1000000" step="any" placeholder="Optional"></label><label class="field">Height<input name="height" type="number" min="0.000001" max="1000000" step="any" placeholder="Optional"></label><label class="field">Unit<select name="dimension_unit"><option value="in">inches (in)</option><option value="cm">centimetres (cm)</option><option value="mm">millimetres (mm)</option></select></label></div><label class="field">Price (CAD)<div class="money-input"><span>$</span><input name="price" type="number" min="0" max="99999999.99" step="0.01" placeholder="Optional"></div></label><label class="field span-two">Description<textarea name="description" maxlength="2000" rows="3" placeholder="Other details that help identify this product"></textarea></label></div><div class="edit-stock-actions" id="product-stock-actions" hidden><div><strong>Stock count</strong><span id="product-stock-count"></span></div><button type="button" class="button secondary" id="product-adjust-stock">Adjust stock</button><p id="product-stock-hint"></p></div><div class="notice error" id="product-error" role="alert" hidden></div></div><div class="modal-footer"><button type="button" class="button secondary close-dialog">Cancel</button><button type="submit" class="button primary" id="product-save">Create product</button></div></form></dialog>
+
+  <dialog id="adjust-dialog" class="modal small-modal" aria-labelledby="adjust-dialog-title"><form id="adjust-form"><div class="modal-heading"><div><span class="eyebrow">STOCK CORRECTION</span><h2 id="adjust-dialog-title">Adjust stock</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close adjustment dialog">×</button></div><div class="modal-body"><div class="selected-product"><strong id="adjust-product-name"></strong><span id="adjust-product-barcode" class="mono"></span></div><div class="current-stock">Current stock <strong id="adjust-current"></strong> <span>items</span></div><label class="field"><span>Correct quantity <span class="required">*</span></span><input type="number" name="quantity" min="0" max="1000000000" step="1" required></label><label class="field"><span>Reason <span class="required">*</span></span><textarea name="reason" rows="3" required maxlength="500" placeholder="e.g. Physical stock count found two extra units"></textarea></label><p class="input-hint">This records the difference as a stock correction. Use Receive stock and Record sale for everyday movements.</p><div class="notice error" id="adjust-error" role="alert" hidden></div></div><div class="modal-footer"><button type="button" class="button secondary close-dialog">Cancel</button><button type="submit" class="button primary" id="adjust-save">Save correction</button></div></form></dialog>
+
+  <dialog id="labels-dialog" class="modal small-modal" aria-labelledby="labels-dialog-title"><div class="modal-heading"><div><span class="eyebrow">PRODUCT BARCODE</span><h2 id="labels-dialog-title">Print labels</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close label dialog">×</button></div><div class="modal-body"><div class="label-preview"><strong id="label-product-name"></strong><img id="label-barcode-image" alt="Product barcode"><span id="label-barcode-text" class="mono"></span></div><div class="form-grid"><label class="field span-two">Copies<input type="number" id="label-copies" min="1" max="100" step="1" value="1" required></label><label class="field">Label width (mm)<input type="number" id="label-width" min="40" max="200" step="1" value="70" required></label><label class="field">Label height (mm)<input type="number" id="label-height" min="25" max="150" step="1" value="40" required></label></div><p class="input-hint">Opens a printable sheet. Choose your printer or Save as PDF, and use 100% scale. Dimensions and scanner readability need a test with your actual label stock and printer.</p><div class="notice error" id="labels-error" role="alert" hidden></div></div><div class="modal-footer"><button type="button" class="button secondary close-dialog">Close</button><button type="button" class="button primary" id="print-labels">Open print sheet</button></div></dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
+
+

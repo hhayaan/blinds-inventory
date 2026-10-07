@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Barcode labels · Windowstock</title>
+  <link rel="stylesheet" href="/static/print.css">
+  <script src="/static/print.js" defer></script>
+</head>
+<body>
+  <header class="print-toolbar">
+    <div class="toolbar-top"><a class="back-link" href="/">← Back to inventory</a><span class="app-name">Windowstock <span>/</span> Barcode labels</span><button id="print-button" disabled>Print / Save as PDF</button></div>
+    <div class="print-heading"><h1 id="print-title">Barcode labels</h1><p id="print-summary">Preparing your printable sheet…</p></div>
+    <p class="print-guidance">Use <strong>100% scale</strong> and choose the correct paper size in the print dialog. Check dimensions, alignment, and barcode readability with your actual label stock and printer. Dashed guides appear on screen only.</p>
+    <p class="print-status" id="print-status" role="status">Loading product details…</p>
+    <div class="print-error" id="print-error" role="alert" hidden></div>
+  </header>
+  <main><div class="label-sheet" id="label-sheet" hidden aria-label="Printable barcode labels"></div></main>
+</body>
+</html>

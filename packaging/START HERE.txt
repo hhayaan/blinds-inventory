@@ -1,0 +1,51 @@
+WINDOWSTOCK - PORTABLE DEMONSTRATION
+
+1. Extract the ENTIRE ZIP into a writable folder on a Windows 10/11 x64 PC,
+   for example a folder on your Desktop. Do not run it inside the ZIP.
+2. Double-click Windowstock.exe directly inside the folder you extracted into.
+3. Your default browser opens the inventory interface. If it does not open,
+   visit http://127.0.0.1:8767 while the application window is running.
+4. Keep the console/server window open while using inventory. Press Ctrl+C
+   in that window to stop the application. Closing the browser alone does
+   not stop it.
+
+You do not need Python, an SQL server, an installer, or administrator access.
+An existing browser is required. Normal operation does not require internet.
+Keep Windowstock.exe and its _internal folder together.
+
+The application starts with an empty inventory. Its own database is created
+at data\inventory.sqlite3 beside Windowstock.exe. This data is independent of
+the developer's database and stays in your extracted application folder.
+Keep that data folder to preserve your products and stock.
+
+TRY THE DEMO
+
+- Add a product. A barcode is generated; stock starts at zero.
+- Copy the barcode into Receive stock. Select quantity 3 and receive it.
+- Record a sale of quantity 1. Two items remain.
+- Try selling quantity 3. "Not enough in stock." is shown; stock stays at 2.
+- Edit product details or correct stock with a reason using Edit product.
+- View Stock history, and open Labels to print or save a PDF preview.
+- Use Download database backup to save a consistent backup elsewhere.
+
+A scanner and printer are optional. Type or paste barcode text to simulate
+scanning. This version submits when you press Enter or click the stock button;
+automatic scan capture and repeated-scan quantity accumulation are deferred.
+
+UPDATING OR MOVING
+
+Download a database backup first, then stop the application. Extract the new
+release into a new folder. To retain inventory, copy data\inventory.sqlite3
+from the stopped old version into a data folder beside the new executable,
+or restore the downloaded backup there. Do not copy SQLite -wal/-shm files
+over a running database. Keep your old folder and backup until you confirm
+the new version shows your inventory and history.
+
+If you see a port-in-use error, stop an earlier Windowstock console window.
+For an alternate port, run .\Windowstock.exe --port 8768 from PowerShell in
+this folder, then visit the address displayed. The program never automatically
+opens an unrelated application that happens to use its port.
+
+This is a local inventory skeleton for demonstration. Product filtering and
+sorting and physical scanner/printer validation remain pending. Closing the
+program preserves inventory; deleting its data folder removes that inventory.
